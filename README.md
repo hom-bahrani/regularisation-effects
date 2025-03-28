@@ -1,5 +1,5 @@
 # regularisation-effects
-This repo contains scripts demonstrating the role of regularisation in preventing overfitting and improving generalisation in machine learning models.
+This repo contains a live Visualisation and scripts demonstrating the role of regularisation in preventing overfitting and improving generalisation in machine learning models. To see the visualisation click [here](https://hom-bahrani.github.io/regularisation-effects/)
 
 ## setup
 
