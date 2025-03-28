@@ -61,6 +61,15 @@ const theme = createTheme({
   },
 });
 
+// Define preset configurations
+const PRESET_CONFIGS = {
+  underfit:  { layers: 1, neurons: 2,   dropoutRate: 0,   l2Reg: 0 },
+  goodFit:   { layers: 2, neurons: 16,  dropoutRate: 0,   l2Reg: 0 },
+  overfit:   { layers: 4, neurons: 64,  dropoutRate: 0,   l2Reg: 0 },
+  l2:        { layers: 4, neurons: 64,  dropoutRate: 0,   l2Reg: 0.01 },
+  dropout:   { layers: 4, neurons: 64,  dropoutRate: 0.3, l2Reg: 0 }
+};
+
 // Function to generate synthetic data
 const generateData = (numPoints, noise) => {
   // Generate x values between -3 and 3
@@ -433,12 +442,47 @@ const MLInteractive = () => {
     valY.dispose();
   };
   
-  // Function to handle parameter changes
+  // Function to handle parameter changes and check if it matches any preset
   const handleParamChange = (param, value) => {
-    setModelParams({
+    const newParams = {
       ...modelParams,
       [param]: value
-    });
+    };
+    
+    setModelParams(newParams);
+    
+    // Check if the new parameters match any preset
+    let matchedPreset = 'custom';
+    for (const [presetName, presetConfig] of Object.entries(PRESET_CONFIGS)) {
+      if (
+        newParams.layers === presetConfig.layers &&
+        newParams.neurons === presetConfig.neurons &&
+        newParams.dropoutRate === presetConfig.dropoutRate &&
+        newParams.l2Reg === presetConfig.l2Reg
+      ) {
+        matchedPreset = presetName;
+        break;
+      }
+    }
+    
+    // Update active model if it changed
+    if (matchedPreset !== activeModel) {
+      setActiveModel(matchedPreset);
+    }
+  };
+  
+  // Function to handle model selection from dropdown
+  const handleModelSelectChange = (event) => {
+    const newActiveModel = event.target.value;
+    setActiveModel(newActiveModel);
+    
+    // Update model parameters to match the selected preset if not custom
+    if (newActiveModel !== 'custom' && PRESET_CONFIGS[newActiveModel]) {
+      setModelParams(prevParams => ({
+        ...prevParams,
+        ...PRESET_CONFIGS[newActiveModel]
+      }));
+    }
   };
   
   // Function to regenerate data
@@ -641,7 +685,7 @@ const MLInteractive = () => {
                     labelId="model-select-label"
                     value={activeModel}
                     label="Select Model"
-                    onChange={(e) => setActiveModel(e.target.value)}
+                    onChange={handleModelSelectChange}
                     disabled={isTraining}
                   >
                     <MenuItem value="custom">Custom Model</MenuItem>
