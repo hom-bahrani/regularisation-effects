@@ -2,7 +2,7 @@
   "name": "ml-visualization",
   "version": "0.1.0",
   "deploy": "gh-pages -d build --dest .",
-  "homepage": "https://hom-bahrani.github.io/ml-visualization/",
+  "homepage": "https://hom-bahrani.github.io/regularisation-effects/",
   "private": true,
   "dependencies": {
     "@emotion/react": "^11.14.0",
