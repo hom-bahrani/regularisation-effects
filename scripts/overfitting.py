@@ -7,6 +7,8 @@ from tensorflow.keras import regularizers
 import time
 import os
 import logging
+import platform
+import subprocess
 
 # Configure logging
 logging.basicConfig(
@@ -16,37 +18,77 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Set random seed for reproducibility
-np.random.seed(42)
-tf.random.set_seed(42)
-
-# Check for GPU/Metal availability on M1 Mac
-logger.info("Checking for GPU availability...")
-gpus = tf.config.list_physical_devices('GPU')
-if gpus:
-    logger.info(f"GPU is available: {gpus}")
-    # Enable memory growth to prevent TF from allocating all GPU memory at once
+# ----- M1 MAC GPU CONFIGURATION -----
+def check_tensorflow_metal():
+    """Check if tensorflow-metal is installed and properly configured"""
+    # Check if we're on macOS
+    if platform.system() != "Darwin":
+        return False
+    
+    # Check if we're on Apple Silicon
     try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-        logger.info("GPU memory growth enabled.")
-    except RuntimeError as e:
-        logger.warning(f"Error setting memory growth: {e}")
-else:
-    logger.info("No GPU found. Running on CPU.")
+        output = subprocess.check_output(['sysctl', '-n', 'machdep.cpu.brand_string']).decode('utf-8')
+        is_apple_silicon = "Apple" in output
+    except:
+        is_apple_silicon = platform.processor() == 'arm'
+    
+    if not is_apple_silicon:
+        return False
+    
+    # Check TensorFlow version
+    tf_version = tf.__version__
+    logger.info(f"TensorFlow version: {tf_version}")
+    
+    # Print if Metal plugin is available
+    try:
+        import tensorflow_metal
+        logger.info(f"tensorflow-metal plugin found: {tensorflow_metal.__version__}")
+        return True
+    except ImportError:
+        logger.warning("tensorflow-metal package is not installed.")
+        logger.warning("For M1/M2 Macs, install with:")
+        logger.warning("pip install tensorflow==2.9.0")
+        logger.warning("pip install tensorflow-metal==0.5.0")
+        logger.warning("Note: Specific versions are required for compatibility.")
+        # Continue anyway as Metal might still work without explicit package in newer TF versions
+    
+    # Set Metal environment variables
+    os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+    os.environ['TF_METAL_DEVICE_ENABLE'] = '1'
+    
+    # Try to detect Metal device
+    devices = tf.config.list_physical_devices()
+    logger.info(f"All detected devices: {devices}")
+    
+    return any('GPU' in str(device) or 'METAL' in str(device) for device in devices)
 
-# For M1 Mac, Apple's Metal plugin for TensorFlow might be available
+# Configure Metal for M1 Mac
+is_metal_available = check_tensorflow_metal()
+
+if is_metal_available:
+    logger.info("Metal acceleration configured and available.")
+    # Try to limit memory growth for stability
+    try:
+        gpus = tf.config.list_physical_devices('GPU')
+        if gpus:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            logger.info("GPU memory growth enabled.")
+    except Exception as e:
+        logger.warning(f"Could not configure GPU memory growth: {e}")
+else:
+    logger.warning("Running on CPU. For faster training on M1/M2 Mac, install compatible versions:")
+    logger.warning("pip install tensorflow==2.9.0")
+    logger.warning("pip install tensorflow-metal==0.5.0")
+
+# ----- PERFORMANCE CONFIGURATION -----
+# Use mixed precision for faster training
 try:
-    # Check if we're on macOS and if Metal is available
-    if hasattr(tf.config, 'experimental') and hasattr(tf.config.experimental, 'get_visible_devices'):
-        physical_devices = tf.config.experimental.get_visible_devices('GPU')
-        if len(physical_devices) > 0:
-            logger.info(f"Metal GPU acceleration is available: {physical_devices}")
-            # Configure TensorFlow to use the Metal plugin
-            os.environ['TF_METAL_DEVICE_ENABLE'] = '1'
-            logger.info("Metal acceleration enabled.")
+    policy = tf.keras.mixed_precision.Policy('mixed_float16')
+    tf.keras.mixed_precision.set_global_policy(policy)
+    logger.info("Mixed precision policy set to: mixed_float16")
 except Exception as e:
-    logger.warning(f"Error checking Metal availability: {e}")
+    logger.warning(f"Could not set mixed precision policy: {e}")
 
 # Custom callback for better logging during training
 class LoggingCallback(keras.callbacks.Callback):
@@ -54,64 +96,63 @@ class LoggingCallback(keras.callbacks.Callback):
         super().__init__()
         self.model_name = model_name
         self.epoch_times = []
+        self.start_time = None
         
     def on_epoch_begin(self, epoch, logs=None):
         self.start_time = time.time()
-        if epoch % 10 == 0:
+        if epoch % 5 == 0:
             logger.info(f"{self.model_name} - Starting epoch {epoch+1}")
         
     def on_epoch_end(self, epoch, logs=None):
+        if self.start_time is None:
+            return
+            
         epoch_time = time.time() - self.start_time
         self.epoch_times.append(epoch_time)
         
-        if epoch % 10 == 0 or epoch == self.params['epochs'] - 1:
+        if epoch % 5 == 0 or epoch == self.params['epochs'] - 1:
             metrics_str = ", ".join([f"{k}: {v:.4f}" for k, v in logs.items()])
             logger.info(f"{self.model_name} - Epoch {epoch+1}/{self.params['epochs']} - {metrics_str} - Time: {epoch_time:.2f}s")
     
     def on_train_end(self, logs=None):
-        avg_time = np.mean(self.epoch_times)
-        logger.info(f"{self.model_name} - Training completed. Average time per epoch: {avg_time:.2f}s")
+        if self.epoch_times:
+            avg_time = np.mean(self.epoch_times)
+            logger.info(f"{self.model_name} - Training completed. Average time per epoch: {avg_time:.2f}s")
 
 # Function to train a model with given number of layers and neurons
 def create_and_train_model(num_layers, neurons, dropout_rate=0, l2_reg=0, epochs=100, model_name="Model"):
     logger.info(f"Creating {model_name} - Layers: {num_layers}, Neurons: {neurons}, Dropout: {dropout_rate}, L2: {l2_reg}")
     
     start_time = time.time()
-    layers_list = []
     
-    # Input layer
-    for i in range(num_layers):
-        if i == 0:
-            # First layer
-            layers_list.append(layers.Dense(neurons, activation='relu', 
-                                           kernel_regularizer=regularizers.l2(l2_reg) if l2_reg > 0 else None))
-            logger.debug(f"Added input layer with {neurons} neurons" + 
-                      (f" and L2 regularization {l2_reg}" if l2_reg > 0 else ""))
-        else:
-            # Hidden layers
-            layers_list.append(layers.Dense(neurons, activation='relu',
-                                           kernel_regularizer=regularizers.l2(l2_reg) if l2_reg > 0 else None))
-            logger.debug(f"Added hidden layer {i} with {neurons} neurons" + 
-                      (f" and L2 regularization {l2_reg}" if l2_reg > 0 else ""))
+    # Create model with explicit input shape
+    model = keras.Sequential()
+    
+    # First layer needs input_shape
+    model.add(layers.Dense(neurons, activation='relu', 
+                         kernel_regularizer=regularizers.l2(l2_reg) if l2_reg > 0 else None,
+                         input_shape=(1,)))  # Explicit input shape for first layer
+    
+    # Add remaining layers
+    for i in range(1, num_layers):
+        model.add(layers.Dense(neurons, activation='relu',
+                             kernel_regularizer=regularizers.l2(l2_reg) if l2_reg > 0 else None))
         
         # Add dropout if specified
         if dropout_rate > 0:
-            layers_list.append(layers.Dropout(dropout_rate))
-            logger.debug(f"Added dropout layer with rate {dropout_rate}")
+            model.add(layers.Dropout(dropout_rate))
     
     # Output layer
-    layers_list.append(layers.Dense(1))
-    logger.debug("Added output layer with 1 neuron")
+    model.add(layers.Dense(1))
     
-    # Create model
-    model = keras.Sequential(layers_list)
+    # Build the model explicitly
+    model.build((None, 1))
     
-    # Compile model
+    # Compile model with best device strategy
     model.compile(optimizer='adam', loss='mse', metrics=['mae'])
-    logger.info(f"{model_name} - Model compiled with {model.count_params()} parameters")
     
-    # Log model summary to debug level
-    model.summary(print_fn=logger.debug)
+    # Now it's safe to count parameters
+    logger.info(f"{model_name} - Model compiled with {model.count_params()} parameters")
     
     # Create callbacks
     callbacks = [
@@ -123,7 +164,7 @@ def create_and_train_model(num_layers, neurons, dropout_rate=0, l2_reg=0, epochs
         LoggingCallback(model_name)
     ]
     
-    logger.info(f"{model_name} - Starting training for up to {epochs} epochs")
+    logger.info(f"{model_name} - Starting training for up to {epochs} epochs (batch size: 16)")
     # Train model with early stopping
     history = model.fit(
         x_train, y_train,
@@ -147,6 +188,8 @@ def create_and_train_model(num_layers, neurons, dropout_rate=0, l2_reg=0, epochs
 # Visualize the learning curves
 def plot_history(histories, labels):
     logger.info("Plotting learning curves...")
+    start_time = time.time()
+    
     plt.figure(figsize=(12, 5))
     
     # Plot training loss
@@ -170,12 +213,18 @@ def plot_history(histories, labels):
     plt.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.show()
-    logger.info("Learning curves plotted")
+    
+    # Use non-blocking mode for plotting to avoid hang
+    plt.ion()
+    plt.draw()
+    plt.pause(0.001)
+    
+    logger.info(f"Learning curves plotted in {time.time() - start_time:.2f}s")
 
 # Make predictions and visualize results
 def plot_predictions(models, labels):
     logger.info("Generating predictions and plotting results...")
+    start_time = time.time()
     
     # Generate points for smooth curve
     x_test = np.linspace(-4, 4, 200).reshape(-1, 1)
@@ -188,8 +237,10 @@ def plot_predictions(models, labels):
     
     # Plot predictions for each model
     for model, label in zip(models, labels):
+        pred_start = time.time()
         logger.info(f"Generating predictions for {label} model...")
         y_pred = model.predict(x_test, verbose=0)
+        logger.info(f"Predictions generated in {time.time() - pred_start:.2f}s")
         plt.plot(x_test, y_pred, linewidth=2, label=f'{label} prediction')
     
     plt.title('Model Predictions Comparison')
@@ -197,8 +248,13 @@ def plot_predictions(models, labels):
     plt.ylabel('y')
     plt.legend()
     plt.grid(True, alpha=0.3)
-    plt.show()
-    logger.info("Prediction comparison plotted")
+    
+    # Use non-blocking mode for plotting to avoid hang
+    plt.ion()
+    plt.draw()
+    plt.pause(0.001)
+    
+    logger.info(f"Predictions plot completed in {time.time() - start_time:.2f}s")
 
 def main():
     global x_train, y_train, x_val, y_val
@@ -226,6 +282,8 @@ def main():
 
     # 2. VISUALIZE OUR DATA
     logger.info("Visualizing dataset...")
+    viz_start = time.time()
+    
     plt.figure(figsize=(10, 6))
     plt.scatter(x_train, y_train, alpha=0.7, label='Training data')
     plt.scatter(x_val, y_val, alpha=0.7, label='Validation data')
@@ -234,8 +292,13 @@ def main():
     plt.ylabel('y')
     plt.legend()
     plt.grid(True, alpha=0.3)
-    plt.show()
-
+    
+    # Use non-blocking mode for plotting
+    plt.ion()
+    plt.draw()
+    plt.pause(0.001)
+    
+    logger.info(f"Dataset visualization completed in {time.time() - viz_start:.2f}s")
     logger.info(f"Training set size: {len(x_train)} samples")
     logger.info(f"Validation set size: {len(x_val)} samples")
 
@@ -246,21 +309,24 @@ def main():
     underfit_model, underfit_history = create_and_train_model(
         num_layers=1, 
         neurons=2, 
-        model_name="Underfit Model"
+        model_name="Underfit Model",
+        epochs=50  # Reduced epochs for faster execution
     )
 
     # 5. EXPERIMENT 2: GOOD FIT
     good_model, good_history = create_and_train_model(
         num_layers=2, 
         neurons=16, 
-        model_name="Good Fit Model"
+        model_name="Good Fit Model",
+        epochs=50  # Reduced epochs for faster execution
     )
 
     # 6. EXPERIMENT 3: OVERFITTING (VERY COMPLEX MODEL)
     overfit_model, overfit_history = create_and_train_model(
         num_layers=4, 
         neurons=64, 
-        model_name="Overfit Model"
+        model_name="Overfit Model",
+        epochs=50  # Reduced epochs for faster execution
     )
 
     # 7. EXPERIMENT 4: REGULARIZED MODEL (L2)
@@ -268,7 +334,8 @@ def main():
         num_layers=4, 
         neurons=64, 
         l2_reg=0.01, 
-        model_name="L2 Regularized Model"
+        model_name="L2 Regularized Model",
+        epochs=50  # Reduced epochs for faster execution
     )
 
     # 8. EXPERIMENT 5: REGULARIZED MODEL (DROPOUT)
@@ -276,7 +343,8 @@ def main():
         num_layers=4, 
         neurons=64, 
         dropout_rate=0.3, 
-        model_name="Dropout Regularized Model"
+        model_name="Dropout Regularized Model",
+        epochs=50  # Reduced epochs for faster execution
     )
 
     # 9. VISUALIZE THE LEARNING CURVES
@@ -293,6 +361,10 @@ def main():
     
     total_time = time.time() - total_start_time
     logger.info(f"Demo completed in {total_time:.2f} seconds")
+    
+    # Keep plots open until user closes them
+    plt.ioff()
+    plt.show()
 
 if __name__ == "__main__":
     main()
