@@ -97,37 +97,65 @@ const generateData = (numPoints, noise) => {
 };
 
 // Create a TensorFlow model based on parameters
-const createModel = () => {
+const createModel = (layers, neurons, dropoutRate, l2Reg) => {
   try {
     // Check if TensorFlow is properly loaded
     if (!tf || typeof tf.sequential !== 'function') {
       throw new Error("TensorFlow.js is not properly loaded. Make sure the library is included in your dependencies.");
     }
     
-    console.log("Creating a very simple model");
-    
-    // Create the simplest possible model
-    const model = tf.sequential();
-    
-    // Add input layer (simplest possible configuration)
-    model.add(tf.layers.dense({
-      units: 1,
-      inputShape: [1]
-    }));
-    
-    // Compile with minimal options
-    model.compile({
-      optimizer: 'sgd',
-      loss: 'meanSquaredError'
+    console.log("Creating model with parameters:", {
+      layers: layers,
+      neurons: neurons,
+      dropoutRate: dropoutRate,
+      l2Reg: l2Reg
     });
     
-    console.log("Basic model created successfully");
+    // Input validation
+    if (!layers || layers < 1) layers = 1;
+    if (!neurons || neurons < 1) neurons = 16;
+    if (!dropoutRate) dropoutRate = 0;
+    if (!l2Reg) l2Reg = 0;
+    
+    const model = tf.sequential();
+    
+    // First layer needs input shape
+    model.add(tf.layers.dense({
+      units: neurons, 
+      activation: 'relu',
+      inputShape: [1],
+      kernelRegularizer: l2Reg > 0 ? tf.regularizers.l2({ l2: l2Reg }) : null
+    }));
+    
+    // Add remaining layers
+    for (let i = 1; i < layers; i++) {
+      model.add(tf.layers.dense({
+        units: neurons,
+        activation: 'relu',
+        kernelRegularizer: l2Reg > 0 ? tf.regularizers.l2({ l2: l2Reg }) : null
+      }));
+      
+      // Add dropout if specified
+      if (dropoutRate > 0) {
+        model.add(tf.layers.dropout({ rate: dropoutRate }));
+      }
+    }
+    
+    // Output layer
+    model.add(tf.layers.dense({ units: 1 }));
+    
+    // Compile model
+    model.compile({
+      optimizer: 'adam',
+      loss: 'meanSquaredError',
+      metrics: ['mae']
+    });
+    
+    console.log("Model created successfully");
+    model.summary();
     return model;
   } catch (error) {
-    console.error("DETAILED ERROR IN MODEL CREATION:", error);
-    console.error("Error message:", error.message);
-    console.error("Error stack:", error.stack);
-    alert("TensorFlow.js error: " + error.message);
+    console.error("Error creating model:", error);
     throw error;
   }
 };
@@ -261,8 +289,13 @@ const MLInteractive = () => {
         throw new Error("No training or validation data available. Please regenerate data.");
       }
       
-      // Create model (simple model, no parameters)
-      const model = createModel();
+      // Create model based on current parameters
+      const model = createModel(
+        modelParams.layers,
+        modelParams.neurons,
+        modelParams.dropoutRate,
+        modelParams.l2Reg
+      );
       
       // Convert data to tensors
       console.log("Creating tensors from data");
@@ -340,28 +373,28 @@ const MLInteractive = () => {
     const newModels = {};
     
     try {
-      // Underfit model (simple model)
-      const underfit = createModel();
+      // Underfit model (1 layer, 2 neurons)
+      const underfit = createModel(1, 2, 0, 0);
       await trainSingleModel(underfit, 'underfit');
       newModels.underfit = underfit;
       
-      // Good fit model (simple model)
-      const goodFit = createModel();
+      // Good fit model (2 layers, 16 neurons)
+      const goodFit = createModel(2, 16, 0, 0);
       await trainSingleModel(goodFit, 'goodFit');
       newModels.goodFit = goodFit;
       
-      // Overfit model (simple model)
-      const overfit = createModel();
+      // Overfit model (4 layers, 64 neurons)
+      const overfit = createModel(4, 64, 0, 0);
       await trainSingleModel(overfit, 'overfit');
       newModels.overfit = overfit;
       
-      // L2 regularized model (simple model)
-      const l2 = createModel();
+      // L2 regularized model (4 layers, 64 neurons, L2 reg)
+      const l2 = createModel(4, 64, 0, 0.01);
       await trainSingleModel(l2, 'l2');
       newModels.l2 = l2;
       
-      // Dropout model (simple model)
-      const dropout = createModel();
+      // Dropout model (4 layers, 64 neurons, dropout)
+      const dropout = createModel(4, 64, 0.3, 0);
       await trainSingleModel(dropout, 'dropout');
       newModels.dropout = dropout;
       
