@@ -3,88 +3,63 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
   Legend, ResponsiveContainer, ScatterChart, Scatter, ZAxis
 } from 'recharts';
+// Material UI imports
+import { 
+  Container, Box, Typography, Grid, Slider, Button, 
+  FormControl, InputLabel, Select, MenuItem,
+  Paper, Card, CardContent, CardHeader, CircularProgress
+} from '@mui/material';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 
-// Make sure we're importing TensorFlow.js correctly
-// Using require instead of import can sometimes help with module loading issues
+// Import TensorFlow.js
 const tf = require('@tensorflow/tfjs');
 
-// Safely check TensorFlow.js availability
-console.log("TensorFlow imported:", tf ? "Yes" : "No");
-console.log("TensorFlow.js version:", tf && tf.version ? tf.version : "not found");
-
-// Component styles
-const styles = {
-  container: {
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
-    padding: '20px',
-    maxWidth: '1200px',
-    margin: '0 auto',
+// Create Material UI theme
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#4285F4',
+    },
+    secondary: {
+      main: '#34A853',
+    },
+    error: {
+      main: '#EA4335',
+    },
+    warning: {
+      main: '#FBBC05',
+    },
+    background: {
+      default: '#f5f5f5',
+    }
   },
-  header: {
-    textAlign: 'center',
-    marginBottom: '30px',
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    h4: {
+      fontWeight: 500,
+    },
+    h5: {
+      fontWeight: 500,
+    }
   },
-  controlPanel: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '20px',
-    marginBottom: '30px',
-    padding: '20px',
-    backgroundColor: 'rgba(0, 0, 0, 0.03)',
-    borderRadius: '8px',
+  components: {
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+        },
+      },
+    },
   },
-  controlGroup: {
-    flex: '1 1 200px',
-  },
-  modelPerformance: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '10px',
-    marginBottom: '20px',
-  },
-  metricCard: {
-    flex: '1 1 150px',
-    padding: '15px',
-    borderRadius: '8px',
-    backgroundColor: 'rgba(0, 0, 0, 0.03)',
-    textAlign: 'center',
-  },
-  chartContainer: {
-    marginBottom: '30px',
-  },
-  slider: {
-    width: '100%',
-  },
-  button: {
-    padding: '10px 15px',
-    backgroundColor: '#4285F4',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    marginRight: '10px',
-  },
-  select: {
-    padding: '8px',
-    borderRadius: '4px',
-    border: '1px solid #ccc',
-    width: '100%',
-  },
-  label: {
-    display: 'block',
-    marginBottom: '8px',
-    fontWeight: 'bold',
-  },
-  spinner: {
-    display: 'inline-block',
-    width: '20px',
-    height: '20px',
-    border: '3px solid rgba(0,0,0,.1)',
-    borderRadius: '50%',
-    borderTopColor: '#4285F4',
-    animation: 'spin 1s ease-in-out infinite',
-  },
-};
+});
 
 // Function to generate synthetic data
 const generateData = (numPoints, noise) => {
@@ -122,7 +97,7 @@ const generateData = (numPoints, noise) => {
 };
 
 // Create a TensorFlow model based on parameters
-const createModel = (layers, neurons, dropoutRate, l2Reg) => {
+const createModel = () => {
   try {
     // Check if TensorFlow is properly loaded
     if (!tf || typeof tf.sequential !== 'function') {
@@ -173,18 +148,9 @@ const MLInteractive = () => {
     l2Reg: 0,
     epochs: 50,
     noiseLevel: 1,
-    dataPoints: 48, // Reduced from 100 to match your screenshot
+    dataPoints: 48,
     batchSize: 16
   });
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      isMounted.current = false;
-      // Clean up any tensors
-      tf.disposeVariables();
-    };
-  }, []);
   
   // State for model performance metrics
   const [metrics, setMetrics] = useState({
@@ -214,6 +180,15 @@ const MLInteractive = () => {
   
   // State for training process
   const [isTraining, setIsTraining] = useState(false);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+      // Clean up any tensors
+      tf.disposeVariables();
+    };
+  }, []);
 
   // Function to generate a smooth curve for display
   const generateCurve = useCallback((model) => {
@@ -268,7 +243,7 @@ const MLInteractive = () => {
       alert("Failed to generate data: " + error.message);
     }
   }, [modelParams?.dataPoints, modelParams?.noiseLevel]);
-  
+
   // Function to train model
   const trainModel = async () => {
     console.log("Starting model training...");
@@ -286,47 +261,70 @@ const MLInteractive = () => {
         throw new Error("No training or validation data available. Please regenerate data.");
       }
       
-      // Create a very simple model (just one layer)
+      // Create model (simple model, no parameters)
       const model = createModel();
       
       // Convert data to tensors
       console.log("Creating tensors from data");
       const trainX = tf.tensor2d(data.trainingData.map(d => [d.x]));
       const trainY = tf.tensor2d(data.trainingData.map(d => [d.y]));
+      const valX = tf.tensor2d(data.validationData.map(d => [d.x]));
+      const valY = tf.tensor2d(data.validationData.map(d => [d.y]));
       
       console.log("Starting training");
-      // Just train the model without validation to keep it simple
       await model.fit(trainX, trainY, {
-        epochs: 5, // Just a few epochs to test
-        batchSize: 16,
-        verbose: 1
+        epochs: modelParams.epochs,
+        batchSize: modelParams.batchSize,
+        validationData: [valX, valY],
+        verbose: 1,
+        callbacks: {
+          onEpochEnd: (epoch, logs) => {
+            historyData.push({
+              epoch,
+              trainLoss: logs.loss,
+              valLoss: logs.val_loss,
+              trainMAE: logs.mae,
+              valMAE: logs.val_mae
+            });
+            
+            // Update history periodically
+            if (epoch % 5 === 0 || epoch === modelParams.epochs - 1) {
+              setHistory([...historyData]);
+            }
+          }
+        }
       });
       
-      console.log("Training completed successfully!");
+      console.log("Training completed");
       
-      // Create a simple prediction curve
-      const xs = tf.linspace(-4, 4, 100);
-      const predictions = model.predict(xs.reshape([100, 1]));
+      // Evaluate the model
+      const trainEval = model.evaluate(trainX, trainY);
+      const valEval = model.evaluate(valX, valY);
       
-      // Convert to array for display
-      const predArray = Array.from(predictions.dataSync());
-      const xsArray = Array.from(xs.dataSync());
+      // Update metrics
+      setMetrics({
+        trainLoss: trainEval[0].dataSync()[0],
+        trainMAE: trainEval[1].dataSync()[0],
+        valLoss: valEval[0].dataSync()[0],
+        valMAE: valEval[1].dataSync()[0]
+      });
       
-      // Create prediction curve data
-      const predictionCurve = xsArray.map((x, i) => ({
-        x: x,
-        y: predArray[i]
-      }));
-      
-      // Update state
-      setPredictions(predictionCurve);
-      setHistory([{epoch: 0, trainLoss: 0}]); // Dummy history
+      // Generate predictions
+      const predictedCurve = generateCurve(model);
+      setPredictions(predictedCurve);
       
       // Clean up tensors
       trainX.dispose();
       trainY.dispose();
-      xs.dispose();
-      predictions.dispose();
+      valX.dispose();
+      valY.dispose();
+      trainEval[0].dispose();
+      trainEval[1].dispose();
+      valEval[0].dispose();
+      valEval[1].dispose();
+      
+      // Update history
+      setHistory(historyData);
       
     } catch (error) {
       console.error("Training error:", error);
@@ -342,28 +340,28 @@ const MLInteractive = () => {
     const newModels = {};
     
     try {
-      // Underfit model (1 layer, 2 neurons)
-      const underfit = createModel(1, 2, 0, 0);
+      // Underfit model (simple model)
+      const underfit = createModel();
       await trainSingleModel(underfit, 'underfit');
       newModels.underfit = underfit;
       
-      // Good fit model (2 layers, 16 neurons)
-      const goodFit = createModel(2, 16, 0, 0);
+      // Good fit model (simple model)
+      const goodFit = createModel();
       await trainSingleModel(goodFit, 'goodFit');
       newModels.goodFit = goodFit;
       
-      // Overfit model (4 layers, 64 neurons)
-      const overfit = createModel(4, 64, 0, 0);
+      // Overfit model (simple model)
+      const overfit = createModel();
       await trainSingleModel(overfit, 'overfit');
       newModels.overfit = overfit;
       
-      // L2 regularized model (4 layers, 64 neurons, L2 reg)
-      const l2 = createModel(4, 64, 0, 0.01);
+      // L2 regularized model (simple model)
+      const l2 = createModel();
       await trainSingleModel(l2, 'l2');
       newModels.l2 = l2;
       
-      // Dropout model (4 layers, 64 neurons, dropout)
-      const dropout = createModel(4, 64, 0.3, 0);
+      // Dropout model (simple model)
+      const dropout = createModel();
       await trainSingleModel(dropout, 'dropout');
       newModels.dropout = dropout;
       
@@ -372,6 +370,7 @@ const MLInteractive = () => {
       
     } catch (error) {
       console.error('Training error:', error);
+      alert("Failed to train preset models: " + error.message);
     } finally {
       setIsTraining(false);
     }
@@ -428,251 +427,350 @@ const MLInteractive = () => {
   }, [activeModel, models, predictions, generateCurve]);
   
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1>Interactive Machine Learning Visualization</h1>
-        <p>Explore underfitting, overfitting, and regularization effects in real-time</p>
-      </div>
-      
-      <div style={styles.controlPanel}>
-        <div style={styles.controlGroup}>
-          <h3>Data Generation</h3>
-          <div>
-            <label style={styles.label}>Number of data points: {modelParams.dataPoints}</label>
-            <input 
-              type="range" 
-              min="20" 
-              max="500"
-              value={modelParams.dataPoints}
-              onChange={(e) => handleParamChange('dataPoints', parseInt(e.target.value))}
-              style={styles.slider}
-            />
-          </div>
-          <div>
-            <label style={styles.label}>Noise level: {modelParams.noiseLevel.toFixed(1)}</label>
-            <input 
-              type="range" 
-              min="0" 
-              max="3" 
-              step="0.1"
-              value={modelParams.noiseLevel}
-              onChange={(e) => handleParamChange('noiseLevel', parseFloat(e.target.value))}
-              style={styles.slider}
-            />
-          </div>
-          <button 
-            style={styles.button} 
-            onClick={handleRegenerateData}
-            disabled={isTraining}
-          >
-            Regenerate Data
-          </button>
-        </div>
+    <ThemeProvider theme={theme}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box sx={{ mb: 4, textAlign: 'center' }}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Interactive Machine Learning Visualization
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary">
+            Explore underfitting, overfitting, and regularization effects in real-time
+          </Typography>
+        </Box>
         
-        <div style={styles.controlGroup}>
-          <h3>Model Architecture</h3>
-          <div>
-            <label style={styles.label}>Number of hidden layers: {modelParams.layers}</label>
-            <input 
-              type="range" 
-              min="1" 
-              max="5"
-              value={modelParams.layers}
-              onChange={(e) => handleParamChange('layers', parseInt(e.target.value))}
-              style={styles.slider}
-              disabled={isTraining}
-            />
-          </div>
-          <div>
-            <label style={styles.label}>Neurons per layer: {modelParams.neurons}</label>
-            <input 
-              type="range" 
-              min="1" 
-              max="128"
-              value={modelParams.neurons}
-              onChange={(e) => handleParamChange('neurons', parseInt(e.target.value))}
-              style={styles.slider}
-              disabled={isTraining}
-            />
-          </div>
-        </div>
-        
-        <div style={styles.controlGroup}>
-          <h3>Regularization</h3>
-          <div>
-            <label style={styles.label}>Dropout rate: {modelParams.dropoutRate.toFixed(2)}</label>
-            <input 
-              type="range" 
-              min="0" 
-              max="0.5" 
-              step="0.05"
-              value={modelParams.dropoutRate}
-              onChange={(e) => handleParamChange('dropoutRate', parseFloat(e.target.value))}
-              style={styles.slider}
-              disabled={isTraining}
-            />
-          </div>
-          <div>
-            <label style={styles.label}>L2 regularization: {modelParams.l2Reg.toFixed(3)}</label>
-            <input 
-              type="range" 
-              min="0" 
-              max="0.05" 
-              step="0.001"
-              value={modelParams.l2Reg}
-              onChange={(e) => handleParamChange('l2Reg', parseFloat(e.target.value))}
-              style={styles.slider}
-              disabled={isTraining}
-            />
-          </div>
-        </div>
-        
-        <div style={styles.controlGroup}>
-          <h3>Training</h3>
-          <div>
-            <label style={styles.label}>Epochs: {modelParams.epochs}</label>
-            <input 
-              type="range" 
-              min="10" 
-              max="100"
-              value={modelParams.epochs}
-              onChange={(e) => handleParamChange('epochs', parseInt(e.target.value))}
-              style={styles.slider}
-              disabled={isTraining}
-            />
-          </div>
-          <div>
-            <label style={styles.label}>Batch size: {modelParams.batchSize}</label>
-            <input 
-              type="range" 
-              min="1" 
-              max="64"
-              value={modelParams.batchSize}
-              onChange={(e) => handleParamChange('batchSize', parseInt(e.target.value))}
-              style={styles.slider}
-              disabled={isTraining}
-            />
-          </div>
-          <div>
-            <button 
-              style={{...styles.button, marginTop: '10px'}} 
-              onClick={trainModel}
-              disabled={isTraining}
-            >
-              {isTraining ? 
-                <><span style={styles.spinner}></span> Training...</> : 
-                'Train Model'}
-            </button>
-          </div>
-        </div>
-        
-        <div style={styles.controlGroup}>
-          <h3>Preset Models</h3>
-          <div>
-            <label style={styles.label}>Select Model</label>
-            <select 
-              style={styles.select} 
-              value={activeModel}
-              onChange={(e) => setActiveModel(e.target.value)}
-              disabled={isTraining}
-            >
-              <option value="custom">Custom Model</option>
-              <option value="underfit" disabled={!models.underfit}>Underfit</option>
-              <option value="goodFit" disabled={!models.goodFit}>Good Fit</option>
-              <option value="overfit" disabled={!models.overfit}>Overfit</option>
-              <option value="l2" disabled={!models.l2}>L2 Regularized</option>
-              <option value="dropout" disabled={!models.dropout}>Dropout</option>
-            </select>
-          </div>
-          <button 
-            style={{...styles.button, marginTop: '10px'}} 
-            onClick={trainAllModels}
-            disabled={isTraining}
-          >
-            {isTraining ? 
-              <><span style={styles.spinner}></span> Training All Models...</> : 
-              'Train All Preset Models'}
-          </button>
-        </div>
-      </div>
-      
-      {metrics.trainLoss !== null && (
-        <div style={styles.modelPerformance}>
-          <div style={styles.metricCard}>
-            <h4>Training Loss</h4>
-            <p>{metrics.trainLoss.toFixed(4)}</p>
-          </div>
-          <div style={styles.metricCard}>
-            <h4>Validation Loss</h4>
-            <p>{metrics.valLoss.toFixed(4)}</p>
-          </div>
-          <div style={styles.metricCard}>
-            <h4>Training MAE</h4>
-            <p>{metrics.trainMAE.toFixed(4)}</p>
-          </div>
-          <div style={styles.metricCard}>
-            <h4>Validation MAE</h4>
-            <p>{metrics.valMAE.toFixed(4)}</p>
-          </div>
-        </div>
-      )}
-      
-      <div style={styles.chartContainer}>
-        <h3>Data and Model Predictions</h3>
-        <ResponsiveContainer width="100%" height={400}>
-          <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" dataKey="x" name="x" />
-            <YAxis type="number" dataKey="y" name="y" />
-            <ZAxis type="number" range={[60]} />
-            <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-            <Legend />
+        <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
+          <Grid container spacing={3}>
+            {/* Data Generation */}
+            <Grid item xs={12} md={4} lg={2.4}>
+              <Typography variant="h6" gutterBottom>
+                Data Generation
+              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <Typography id="data-points-slider" gutterBottom>
+                  Number of data points: {modelParams.dataPoints}
+                </Typography>
+                <Slider
+                  aria-labelledby="data-points-slider"
+                  min={20}
+                  max={500}
+                  value={modelParams.dataPoints}
+                  onChange={(_, value) => handleParamChange('dataPoints', value)}
+                  disabled={isTraining}
+                />
+              </Box>
+              <Box sx={{ mb: 2 }}>
+                <Typography id="noise-level-slider" gutterBottom>
+                  Noise level: {modelParams.noiseLevel.toFixed(1)}
+                </Typography>
+                <Slider
+                  aria-labelledby="noise-level-slider"
+                  min={0}
+                  max={3}
+                  step={0.1}
+                  value={modelParams.noiseLevel}
+                  onChange={(_, value) => handleParamChange('noiseLevel', value)}
+                  disabled={isTraining}
+                />
+              </Box>
+              <Button 
+                variant="contained" 
+                fullWidth
+                onClick={handleRegenerateData}
+                disabled={isTraining}
+              >
+                Regenerate Data
+              </Button>
+            </Grid>
             
-            {/* Training data points */}
-            <Scatter 
-              name="Training Data" 
-              data={data.trainingData} 
-              fill="#8884d8" 
-              shape="circle"
-            />
+            {/* Model Architecture */}
+            <Grid item xs={12} md={4} lg={2.4}>
+              <Typography variant="h6" gutterBottom>
+                Model Architecture
+              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <Typography id="layers-slider" gutterBottom>
+                  Number of hidden layers: {modelParams.layers}
+                </Typography>
+                <Slider
+                  aria-labelledby="layers-slider"
+                  min={1}
+                  max={5}
+                  value={modelParams.layers}
+                  onChange={(_, value) => handleParamChange('layers', value)}
+                  disabled={isTraining}
+                  marks
+                  step={1}
+                  valueLabelDisplay="auto"
+                />
+              </Box>
+              <Box sx={{ mb: 2 }}>
+                <Typography id="neurons-slider" gutterBottom>
+                  Neurons per layer: {modelParams.neurons}
+                </Typography>
+                <Slider
+                  aria-labelledby="neurons-slider"
+                  min={1}
+                  max={128}
+                  value={modelParams.neurons}
+                  onChange={(_, value) => handleParamChange('neurons', value)}
+                  disabled={isTraining}
+                />
+              </Box>
+            </Grid>
             
-            {/* Validation data points */}
-            <Scatter 
-              name="Validation Data" 
-              data={data.validationData} 
-              fill="#82ca9d" 
-              shape="circle"
-            />
+            {/* Regularization */}
+            <Grid item xs={12} md={4} lg={2.4}>
+              <Typography variant="h6" gutterBottom>
+                Regularization
+              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <Typography id="dropout-slider" gutterBottom>
+                  Dropout rate: {modelParams.dropoutRate.toFixed(2)}
+                </Typography>
+                <Slider
+                  aria-labelledby="dropout-slider"
+                  min={0}
+                  max={0.5}
+                  step={0.05}
+                  value={modelParams.dropoutRate}
+                  onChange={(_, value) => handleParamChange('dropoutRate', value)}
+                  disabled={isTraining}
+                />
+              </Box>
+              <Box sx={{ mb: 2 }}>
+                <Typography id="l2-slider" gutterBottom>
+                  L2 regularization: {modelParams.l2Reg.toFixed(3)}
+                </Typography>
+                <Slider
+                  aria-labelledby="l2-slider"
+                  min={0}
+                  max={0.05}
+                  step={0.001}
+                  value={modelParams.l2Reg}
+                  onChange={(_, value) => handleParamChange('l2Reg', value)}
+                  disabled={isTraining}
+                />
+              </Box>
+            </Grid>
             
-            {/* Model predictions */}
-            <Scatter
-              name={`${activeModel === 'custom' ? 'Custom' : activeModel} Model Predictions`}
-              data={getActiveModelPredictions()}
-              fill="#ff7300"
-              line
-              shape="none"
-            />
-          </ScatterChart>
-        </ResponsiveContainer>
-      </div>
-      
-      {history.length > 0 && (
-        <div style={styles.chartContainer}>
-          <h3>Training History</h3>
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={history} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="epoch" label={{ value: 'Epochs', position: 'insideBottom', offset: -10 }} />
-              <YAxis label={{ value: 'Loss', angle: -90, position: 'insideLeft' }} />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="trainLoss" name="Training Loss" stroke="#8884d8" activeDot={{ r: 8 }} />
-              <Line type="monotone" dataKey="valLoss" name="Validation Loss" stroke="#82ca9d" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-    </div>
+            {/* Training */}
+            <Grid item xs={12} md={6} lg={2.4}>
+              <Typography variant="h6" gutterBottom>
+                Training
+              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <Typography id="epochs-slider" gutterBottom>
+                  Epochs: {modelParams.epochs}
+                </Typography>
+                <Slider
+                  aria-labelledby="epochs-slider"
+                  min={10}
+                  max={100}
+                  value={modelParams.epochs}
+                  onChange={(_, value) => handleParamChange('epochs', value)}
+                  disabled={isTraining}
+                />
+              </Box>
+              <Box sx={{ mb: 2 }}>
+                <Typography id="batch-size-slider" gutterBottom>
+                  Batch size: {modelParams.batchSize}
+                </Typography>
+                <Slider
+                  aria-labelledby="batch-size-slider"
+                  min={1}
+                  max={64}
+                  value={modelParams.batchSize}
+                  onChange={(_, value) => handleParamChange('batchSize', value)}
+                  disabled={isTraining}
+                />
+              </Box>
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                onClick={trainModel}
+                disabled={isTraining}
+                startIcon={isTraining && <CircularProgress size={20} color="inherit" />}
+              >
+                {isTraining ? 'Training...' : 'Train Model'}
+              </Button>
+            </Grid>
+            
+            {/* Preset Models */}
+            <Grid item xs={12} md={6} lg={2.4}>
+              <Typography variant="h6" gutterBottom>
+                Preset Models
+              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <FormControl fullWidth>
+                  <InputLabel id="model-select-label">Select Model</InputLabel>
+                  <Select
+                    labelId="model-select-label"
+                    value={activeModel}
+                    label="Select Model"
+                    onChange={(e) => setActiveModel(e.target.value)}
+                    disabled={isTraining}
+                  >
+                    <MenuItem value="custom">Custom Model</MenuItem>
+                    <MenuItem value="underfit" disabled={!models.underfit}>Underfit</MenuItem>
+                    <MenuItem value="goodFit" disabled={!models.goodFit}>Good Fit</MenuItem>
+                    <MenuItem value="overfit" disabled={!models.overfit}>Overfit</MenuItem>
+                    <MenuItem value="l2" disabled={!models.l2}>L2 Regularized</MenuItem>
+                    <MenuItem value="dropout" disabled={!models.dropout}>Dropout</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Button
+                variant="contained"
+                color="secondary"
+                fullWidth
+                onClick={trainAllModels}
+                disabled={isTraining}
+                startIcon={isTraining && <CircularProgress size={20} color="inherit" />}
+              >
+                {isTraining ? 'Training All Models...' : 'Train All Preset Models'}
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+        
+        {/* Metrics Cards */}
+        {metrics.trainLoss !== null && (
+          <Grid container spacing={2} sx={{ mb: 4 }}>
+            <Grid item xs={6} sm={3}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    Training Loss
+                  </Typography>
+                  <Typography variant="h5">
+                    {metrics.trainLoss.toFixed(4)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    Validation Loss
+                  </Typography>
+                  <Typography variant="h5">
+                    {metrics.valLoss.toFixed(4)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    Training MAE
+                  </Typography>
+                  <Typography variant="h5">
+                    {metrics.trainMAE.toFixed(4)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    Validation MAE
+                  </Typography>
+                  <Typography variant="h5">
+                    {metrics.valMAE.toFixed(4)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        )}
+        
+        {/* Data and Predictions Chart */}
+        <Card sx={{ mb: 4 }}>
+          <CardHeader title="Data and Model Predictions" />
+          <CardContent>
+            <ResponsiveContainer width="100%" height={400}>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" dataKey="x" name="x" />
+                <YAxis type="number" dataKey="y" name="y" />
+                <ZAxis type="number" range={[60]} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                <Legend />
+                
+                {/* Training data points */}
+                <Scatter 
+                  name="Training Data" 
+                  data={data.trainingData} 
+                  fill="#8884d8" 
+                  shape="circle"
+                  fillOpacity={0.7}
+                />
+                
+                {/* Validation data points */}
+                <Scatter 
+                  name="Validation Data" 
+                  data={data.validationData} 
+                  fill="#82ca9d" 
+                  shape="circle"
+                  fillOpacity={0.7}
+                />
+                
+                {/* Model predictions */}
+                <Scatter
+                  name={`${activeModel === 'custom' ? 'Custom' : activeModel} Model Predictions`}
+                  data={getActiveModelPredictions()}
+                  fill="#ff7300"
+                  line={{ stroke: '#ff7300', strokeWidth: 2 }}
+                  shape="none"
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        
+        {/* Training History Chart */}
+        {history.length > 0 && (
+          <Card>
+            <CardHeader title="Training History" />
+            <CardContent>
+              <ResponsiveContainer width="100%" height={400}>
+                <LineChart data={history} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="epoch" 
+                    label={{ value: 'Epochs', position: 'insideBottom', offset: -10 }} 
+                  />
+                  <YAxis 
+                    label={{ value: 'Loss', angle: -90, position: 'insideLeft' }} 
+                  />
+                  <Tooltip />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="trainLoss" 
+                    name="Training Loss" 
+                    stroke="#8884d8" 
+                    activeDot={{ r: 8 }}
+                    strokeWidth={2} 
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="valLoss" 
+                    name="Validation Loss" 
+                    stroke="#82ca9d"
+                    strokeWidth={2} 
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+      </Container>
+    </ThemeProvider>
   );
 };
 
