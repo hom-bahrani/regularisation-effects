@@ -17,9 +17,9 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## 📚 Overview
+## Overview
 
-Through hands-on code examples, this repository demonstrates:
+This repository demonstrates:
 
 - The optimization-generalization tradeoff
 - Underfitting and overfitting phenomena
@@ -27,11 +27,6 @@ Through hands-on code examples, this repository demonstrates:
 - Regularization methods
 - The importance of proper data handling
 
-Each script provides practical implementations of concepts that are essential to understand when building effective machine learning models.
-
-## 🗂️ Repository Contents
-
-This repository contains three main Python scripts:
 
 ### 1. `overfitting.py`
 
@@ -66,7 +61,7 @@ Deep-dive into various regularization methods using the California Housing datas
 - Explores the relationship between model capacity and regularization
 - Compares different regularization techniques
 
-## 🧪 Experiment Results and Analysis
+## Experiment Results and Analysis
 
 The following results demonstrate the core concepts of underfitting, overfitting, and regularization using a synthetic regression dataset.
 
@@ -151,35 +146,4 @@ This visualization shows how each model fits the underlying pattern:
    - Subsequent epochs ran much faster at ~0.1-0.13 seconds each
    - Total experiment completed in under 40 seconds
 
-## 🔧 Setup and Requirements
 
-### Prerequisites:
-- Python 3.7+
-- TensorFlow 2.x
-- NumPy
-- Matplotlib
-- scikit-learn
-
-### Installation:
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/machine-learning-fundamentals.git
-cd machine-learning-fundamentals
-
-# Create a virtual environment (optional but recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install tensorflow numpy matplotlib scikit-learn
-```
-
-### GPU Acceleration (Apple Silicon Macs):
-
-For M1/M2 Macs, install the following for GPU acceleration:
-
-```bash
-pip install tensorflow==2.9.0
-pip install tensorflow-metal==0.5.0
-```
