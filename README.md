@@ -74,7 +74,7 @@ The following results demonstrate the core concepts of underfitting, overfitting
 
 The experiment uses a synthetic quadratic dataset with added noise (y = 0.5x² + x + 2 + random noise):
 
-![Synthetic Regression Dataset](plots/Figure_3.png)
+![Synthetic Regression Dataset](plots/Figure_1.png)
 
 This dataset is split into training data (blue) and validation data (orange) to evaluate model performance on unseen data.
 
@@ -82,7 +82,7 @@ This dataset is split into training data (blue) and validation data (orange) to 
 
 The learning curves show how different models perform during training:
 
-![Learning Curves - Training vs Validation Loss](plots/Figure_1.png)
+![Learning Curves - Training vs Validation Loss](plots/Figure_2.png)
 
 **Observations:**
 
@@ -112,7 +112,7 @@ The learning curves show how different models perform during training:
 
 This visualization shows how each model fits the underlying pattern:
 
-![Model Predictions Comparison](plots/Figure_2.png)
+![Model Predictions Comparison](plots/Figure_3.png)
 
 **Observations:**
 
