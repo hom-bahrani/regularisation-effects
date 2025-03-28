@@ -1,6 +1,7 @@
 {
   "name": "ml-visualization",
   "version": "0.1.0",
+  "deploy": "gh-pages -d build --dest .",
   "homepage": "https://hom-bahrani.github.io/ml-visualization/",
   "private": true,
   "dependencies": {
