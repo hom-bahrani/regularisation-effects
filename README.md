@@ -33,7 +33,7 @@ Each script provides practical implementations of concepts that are essential to
 
 This repository contains three main Python scripts:
 
-### 1. `ml-fundamentals.py`
+### 1. `overfitting.py`
 
 Demonstrates the fundamental concepts of underfitting, overfitting, and regularization using synthetic data.
 
@@ -44,7 +44,7 @@ Demonstrates the fundamental concepts of underfitting, overfitting, and regulari
 - Visualizes learning curves and model predictions
 - Demonstrates the transition from underfitting to overfitting
 
-### 2. `cross-validation-demo.py`
+### 2. `cross_validation_demo.py`
 
 Explores different validation techniques for reliable model evaluation.
 
@@ -55,7 +55,7 @@ Explores different validation techniques for reliable model evaluation.
 - Visualizes performance across different folds
 - Uses scikit-learn's KFold with Keras models
 
-### 3. `regularization-techniques.py`
+### 3. `regularisation_techniques.py`
 
 Deep-dive into various regularization methods using the California Housing dataset.
 
